@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "jupyter-sql-converter"
+authors = [
+    {name = "Rafael Lopez", email = "rafael.lopez@universite-paris-saclay.fr"},
+]
+description = "My package description"
+readme = "README.md"
+requires-python = ">=3.10"
+keywords = ["jupyter", "nbconvert", "SQL"]
+license = {text = "MIT"}
+classifiers = [
+    "Programming Language :: Python :: 3",
+]
+dependencies = [
+    "jupyter",
+    "nbconvert",
+    "pandas",
+    "sqlalchemy",
+    "html2image",
+    "typer[all]",
+]
+dynamic = ["version"]
+
+[tool.setuptools.dynamic]
+version = {attr = "jupytersqlconverter.VERSION"}
+
+[project.optional-dependencies]
+tests = ["pytest"]
+oracle = ["oracledb"]
+
+[project.scripts]
+jupyter-sql-converter = "jupytersqlconverter.cli:app"
