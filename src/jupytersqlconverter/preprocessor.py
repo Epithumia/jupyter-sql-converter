@@ -27,9 +27,10 @@ df.to_html()
                     "metadata": {},
                     "source": "```sql\n" + c["source"] + "\n```",
                 }
-                pre["metadata"]["tags"] = c["metadata"]["tags"]
+                pre["metadata"]["tags"] = c["metadata"]["tags"][:]
+                pre["metadata"]["tags"].append("sql_source")
                 nb["cells"].append(nb_from_dict(pre))
-                c["metadata"]["tags"].append("execute")
+                c["metadata"]["tags"].append("sql_execute")
             nb["cells"].append(c)
         return super().preprocess(nb, resources, km)
 
@@ -37,7 +38,7 @@ df.to_html()
         if (
             "tags" in cell["metadata"]
             and "sql" in cell["metadata"]["tags"]
-            and "execute" in cell["metadata"]["tags"]
+            and "sql_execute" in cell["metadata"]["tags"]
         ):
             cell["source"] = (
                 self.import_str
@@ -46,8 +47,8 @@ df.to_html()
                 + "\n"
                 + self.db_query.format(source=cell["source"])
             )
-            cell["metadata"]["tags"].remove("execute")
-            cell["metadata"]["tags"].append("executed")
+            cell["metadata"]["tags"].remove("sql_execute")
+            cell["metadata"]["tags"].append("sql_executed")
         return super().preprocess_cell(cell, resources, index)
 
 
@@ -64,9 +65,10 @@ class CleanupProcessor(ExecutePreprocessor):
             if (
                 "tags" in c["metadata"]
                 and "outputs" in c
-                and "executed" in c["metadata"]["tags"]
+                and "sql_executed" in c["metadata"]["tags"]
             ):
-                c["metadata"]["tags"].remove("executed")
+                c["metadata"]["tags"].remove("sql_executed")
+                c["metadata"]["tags"].append("sql_result")
                 output = c["outputs"][0]["data"]["text/plain"]
                 output2 = str(output).replace("\\n", "")
                 pre = {
