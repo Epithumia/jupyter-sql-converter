@@ -1,6 +1,8 @@
+import datetime as dt
 from typing import Optional
 import nbformat
 import typer
+import re
 from pathlib import Path
 from typing_extensions import Annotated
 from enum import Enum
@@ -9,7 +11,19 @@ from .preprocessor import (
     CleanupProcessor,
     StudentPreprocessor,
 )
-from rich.markdown import Markdown
+from jinja2 import (
+    Environment,
+    PackageLoader,
+    FileSystemLoader,
+    select_autoescape,
+    Undefined,
+)
+from .utils import (
+    preprocess_cells_latex,
+    preprocess_cells_markdown,
+    preprocess_cells_markdown_html,
+    sql_result_to_png,
+)
 
 app = typer.Typer(
     no_args_is_help=True,
@@ -21,10 +35,8 @@ app = typer.Typer(
 NB_EXT = ".ipynb"
 
 
-class ExtractMode(str, Enum):
-    jupyter = "jupyter"
+class ConvertMode(str, Enum):
     latex = "latex"
-    images = "images"
     markdown = "markdown"
     mdhtml = "md+html"
 
@@ -90,8 +102,8 @@ def evaluate_sql(
         print(f"Successfully evaluated {notebook.name} and saved it into {fname}.")
 
 
-@app.command("extract")
-def extract_exercise(
+@app.command("convert")
+def convert_exercise(
     notebook: Annotated[
         Path,
         typer.Argument(
@@ -102,10 +114,113 @@ def extract_exercise(
             help="Path to the notebook to extract.",
         ),
     ],
-    exercise: Annotated[
-        str,
+    output_path: Annotated[
+        Path,
         typer.Argument(
-            help="Exercise name to extract. In the notebook, cell tags will be searched for that name and all cells matching the tag will be extracted. In image mode, only cells also tagged with 'result' will be extracted and converted to images."
+            exists=True,
+            file_okay=False,
+            dir_okay=True,
+            resolve_path=False,
+            help="Output path where the extracted notebook will be saved",
+        ),
+    ] = "./",
+    template: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--template",
+            "-t",
+            exists=True,
+            file_okay=True,
+            dir_okay=False,
+            resolve_path=True,
+        ),
+    ] = None,
+    conversion_target: Annotated[
+        ConvertMode,
+        typer.Option(
+            "--mode",
+            "-m",
+            help="""Extraction mode :
+- latex: will extract the exercise as a single latex file using *template* if specified, and a default template otherwise. Results of sql queries will be inserted as image paths.
+- markdown: will extract the exercise as a single markdown file using *template* if specified, and a default template otherwise. Results of sql queries will be inserted as image paths.
+- md+html: same as above, but results of queries will be inserted as html tables.
+""",
+        ),
+    ] = ConvertMode.markdown,
+):
+    nb = nbformat.read(notebook, as_version=4)
+    image_name = notebook.name
+    image_name = image_name.replace(NB_EXT, "")
+
+    if conversion_target == ConvertMode.latex:
+        output_path = output_path.resolve()
+        cells = preprocess_cells_latex(nb, output_path, image_name)
+    elif conversion_target == ConvertMode.markdown:
+        cells = preprocess_cells_markdown(nb, output_path, image_name)
+    else:
+        cells = preprocess_cells_markdown_html(nb)
+
+    title = Undefined()
+    name = notebook.stem
+    date = dt.datetime.now()
+    author = Undefined()
+    categories = []
+    exercise_type = Undefined()
+    status = Undefined()
+    tags = []
+    description = Undefined()
+
+    if template is None:
+        env = Environment(
+            loader=PackageLoader("jupytersqlconverter"), autoescape=select_autoescape()
+        )
+        if conversion_target in [ConvertMode.markdown, ConvertMode.mdhtml]:
+            template = env.get_template("markdown.jinja")
+
+        elif conversion_target == ConvertMode.latex:
+            template = env.get_template("latex.jinja")
+    else:
+        t = template.name
+        env = Environment(loader=FileSystemLoader(template.parents[0]))
+        template = env.get_template(t)
+
+    output = template.render(
+            {
+                "title": title,
+                "name": name,
+                "author": author,
+                "date": date,
+                "categories": categories,
+                "exercise_type": exercise_type,
+                "status": status,
+                "tags": tags,
+                "description": description,
+                "cells": cells,
+            }
+        )
+    output = output.replace('    \n', '\n')
+    output = re.sub('\n\n+', '\n\n', output).rstrip()
+    if conversion_target == ConvertMode.latex:
+        out_file = output_path.joinpath(notebook.stem + '.tex')
+    if conversion_target in [ConvertMode.markdown, ConvertMode.mdhtml]:
+        out_file =  output_path.joinpath(notebook.stem + '.md')
+    with open(out_file, 'w') as f:
+        f.write(output)
+
+
+@app.command(
+    "extract",
+    help="This will extract the results of the queries in the exercise as png images.",
+)
+def extract_images(
+    notebook: Annotated[
+        Path,
+        typer.Argument(
+            exists=True,
+            file_okay=True,
+            dir_okay=False,
+            resolve_path=True,
+            help="Path to the notebook to extract.",
         ),
     ],
     output_path: Annotated[
@@ -129,25 +244,15 @@ def extract_exercise(
             resolve_path=True,
         ),
     ] = None,
-    extraction_mode: Annotated[
-        ExtractMode,
-        typer.Option(
-            "--mode",
-            "-m",
-            help="""Extraction mode :
-- jupyter: will extract the exercise as *exercise*.ipynb.
-- latex: will extract the exercise as a single latex file using *template* if specified, and a default template otherwise. Results of sql queries will be inserted as image paths.
-- images: will extract the results of the queries in the exercise as png images.
-- markdown: will extract the exercise as a single markdown file using *template* if specified, and a default template otherwise. Results of sql queries will be inserted as image paths.
-- md+html: same as above, but results of queries will be inserted as html tables.
-""",
-        ),
-    ] = ExtractMode.jupyter,
 ):
-    # TODO: complete
-    print(
-        f"Input: {notebook.name}, exercise: {exercise}, out path: {output_path}, template: {template}, mode: {extraction_mode.value}"
-    )
+    nb = nbformat.read(notebook, as_version=4)
+    image_name = notebook.name
+    image_name = image_name.replace(NB_EXT, "")
+    i = 0
+    for cell in nb["cells"]:
+        i += 1
+        if not sql_result_to_png(cell, image_name + "_" + str(i), output_path):
+            i -= 1
 
 
 @app.command("student")
@@ -169,7 +274,7 @@ def extract_student_version(
             file_okay=False,
             dir_okay=True,
             resolve_path=True,
-            help="Output path where the converted notebook will be saved",
+            help="Output path where the student notebook will be saved",
         ),
     ] = "./",
     output_file: Annotated[

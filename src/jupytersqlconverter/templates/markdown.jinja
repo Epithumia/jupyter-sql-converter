@@ -1,0 +1,36 @@
+---
+{%- if title %}
+title: {{ title }}
+{%- endif -%}
+{%- if author %}
+author: {{ author }}
+{%- endif -%}
+{%- if date %}
+date: {{ date }}
+{%- endif -%}
+{%- if categories %}
+categories:
+{% for cat in categories %}- {{cat}}
+{% endfor -%}
+{%- endif -%}
+{%- if exercise_type %}
+type: {{ exercise_type }}
+{%- endif -%}
+{%- if status %}
+statut: {{status}}
+{%- endif -%}
+{%- if tags %}
+tags:
+{% for tag in tags %}- {{tag}}
+{% endfor -%}
+{%- endif -%}
+{%- if description -%}
+description: {{description}}
+{%- endif %}
+---
+
+{%- for cell in cells -%}
+{% if cell['type'] == 'solution_start'%}!!! success "Correction"{% endif %}
+{% if 'solution' in cell['type'] %}{% for row in cell['source'].split('\n') %}    {{row.rstrip()}}
+{% endfor -%}{% else %}{{ cell['source'] }}{% endif %}
+{% endfor %}

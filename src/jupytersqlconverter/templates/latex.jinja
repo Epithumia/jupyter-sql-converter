@@ -1,0 +1,47 @@
+%! Suppress = MissingImport
+%! Suppress = Unicode
+{%- if title %}
+% title: {{ title }}
+{%- endif -%}
+{%- if author %}
+% author: {{ author }}
+{%- endif -%}
+{%- if date %}
+% date: {{ date }}
+{%- endif -%}
+{%- if categories %}
+% categories:
+{% for cat in categories %}% - {{cat}}
+{% endfor -%}
+{%- endif -%}
+{%- if exercise_type %}
+% type: {{ exercise_type }}
+{%- endif -%}
+{%- if status %}
+% statut: {{status}}
+{%- endif -%}
+{%- if tags %}
+% tags:
+{% for tag in tags %}% - {{tag}}
+{% endfor -%}
+{%- endif -%}
+{%- if description -%}
+% description: {{description}}
+{%- endif %}
+\begin{defproblem}[][]{ {{-name-}} }
+
+{% for cell in cells %}
+
+{% if cell['type'] == 'solution_start'%}
+\begin{onlysolution}
+\begin{solution}
+{% endif -%}
+{{- cell['source'] -}}
+{% if cell['type'] == 'solution_end'%}
+\end{solution}
+\end{onlysolution}
+{% endif -%}
+{% endfor %}
+
+\end{defproblem}
+

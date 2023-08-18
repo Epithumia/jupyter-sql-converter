@@ -20,8 +20,9 @@ dependencies = [
     "nbconvert",
     "pandas",
     "sqlalchemy",
-    "html2image",
     "typer[all]",
+    "pandoc",
+    "jinja2",
 ]
 dynamic = ["version"]
 

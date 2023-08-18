@@ -95,3 +95,18 @@ class StudentPreprocessor(ExecutePreprocessor):
             if not ("tags" in c["metadata"] and "correction" in c["metadata"]["tags"]):
                 nb["cells"].append(c)
         return super().preprocess(nb, resources, km)
+
+
+class MergePreprocessor(SQLExecuteProcessor):
+    def __init__(self, **kw):
+        super().__init__(**kw)
+
+    def preprocess(
+        self, nb: NotebookNode, resources: Any = None, km: KernelManager | None = None
+    ) -> Tuple[NotebookNode, dict]:
+        cells = nb["cells"][:]
+        nb["cells"] = []
+        for c in cells:
+            if "tags" in c["metadata"] and "include" in c["metadata"]["tags"]:
+                print(c['source'])
+        return super().preprocess(nb, resources, km)
