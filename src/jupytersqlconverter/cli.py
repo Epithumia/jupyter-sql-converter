@@ -10,6 +10,7 @@ from .preprocessor import (
     SQLExecuteProcessor,
     CleanupProcessor,
     StudentPreprocessor,
+    TranscludePreprocessor,
 )
 from jinja2 import (
     Environment,
@@ -304,6 +305,54 @@ def extract_student_version(
             f"Successfully extracted the student version from {notebook.name} and saved it into {fname}."
         )
 
+@app.command("transclude")
+def transclude(
+    notebook: Annotated[
+        Path,
+        typer.Argument(
+            exists=True,
+            file_okay=True,
+            dir_okay=False,
+            resolve_path=True,
+            help="Path to the notebook to preprocess for transclusion.",
+        ),
+    ],
+    output_path: Annotated[
+        Path,
+        typer.Argument(
+            exists=True,
+            file_okay=False,
+            dir_okay=True,
+            resolve_path=True,
+            help="Output path where the student notebook will be saved",
+        ),
+    ] = "./",
+    output_file: Annotated[
+        Optional[str],
+        typer.Option(
+            "--out",
+            "-o",
+            help="File name for the new notebook. If not specified, will suffix the filename with _transcluded.",
+        ),
+    ] = None,
+):
+    nb = nbformat.read(notebook, as_version=4)
+    ep = TranscludePreprocessor()
+    ep.preprocess(nb, notebook.parent)
+
+    if output_file is None:
+        fname = notebook.name
+        fname = fname.replace(NB_EXT, "_transcluded.ipynb")
+    else:
+        fname = output_file
+        if not fname.endswith(NB_EXT):
+            fname += NB_EXT
+
+    with open(output_path.joinpath(fname), "w", encoding="utf-8") as f:
+        nbformat.write(nb, f)
+        print(
+            f"Successfully transcluded from {notebook.name} and saved it into {fname}."
+        )
 
 if __name__ == "__main__":
     # calling the main function

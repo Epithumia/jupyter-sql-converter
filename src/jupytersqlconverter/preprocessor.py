@@ -1,7 +1,11 @@
+from pathlib import Path
 from typing import Any, Tuple
 from jupyter_client.manager import KernelManager
-from nbconvert.preprocessors import ExecutePreprocessor
+from nbconvert.preprocessors import ExecutePreprocessor, Preprocessor
 from nbformat import NotebookNode, from_dict as nb_from_dict
+import re
+
+import nbformat
 
 
 class SQLExecuteProcessor(ExecutePreprocessor):
@@ -97,16 +101,32 @@ class StudentPreprocessor(ExecutePreprocessor):
         return super().preprocess(nb, resources, km)
 
 
-class MergePreprocessor(SQLExecuteProcessor):
+class TranscludePreprocessor(Preprocessor):
     def __init__(self, **kw):
         super().__init__(**kw)
 
     def preprocess(
-        self, nb: NotebookNode, resources: Any = None, km: KernelManager | None = None
-    ) -> Tuple[NotebookNode, dict]:
+        self, nb: NotebookNode, path: Path, resources: Any = None) -> Tuple[NotebookNode, dict]:
+        expr = re.compile(r"{{(?P<file>.*?)}}", re.M)
         cells = nb["cells"][:]
         nb["cells"] = []
         for c in cells:
-            if "tags" in c["metadata"] and "include" in c["metadata"]["tags"]:
-                print(c['source'])
-        return super().preprocess(nb, resources, km)
+            if c["cell_type"] in ['raw', 'markdown']:
+                source = c["source"][:]
+                source = source.strip()
+                match = expr.match(source)
+                if match:
+                    target = match.group('file')
+                    if not target.endswith('.ipynb'):
+                        target += '.ipynb'
+                    transcluded_path = path.joinpath(target).resolve()
+                    transcluded_nb =  nbformat.read(transcluded_path, as_version=4)
+                    nb["cells"].extend(transcluded_nb["cells"])
+                else:
+                    nb["cells"].append(c)
+            else:
+                nb["cells"].append(c)
+        return super().preprocess(nb, resources)
+
+    def preprocess_cell(self, cell, resources, _):
+        return cell, resources
