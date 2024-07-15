@@ -4,7 +4,7 @@ from jupyter_client.manager import KernelManager
 from nbconvert.preprocessors import ExecutePreprocessor, Preprocessor
 from nbformat import NotebookNode, from_dict as nb_from_dict
 import re
-
+import fnmatch
 import nbformat
 
 
@@ -16,7 +16,7 @@ class SQLExecuteProcessor(ExecutePreprocessor):
         self.db_query = """
 df = pd.read_sql(sql=\"\"\"{source}\"\"\", con=conn)
 df.index += 1
-df.to_html()
+{limiter}
 """
 
     def preprocess(
@@ -44,12 +44,17 @@ df.to_html()
             and "sql" in cell["metadata"]["tags"]
             and "sql_execute" in cell["metadata"]["tags"]
         ):
+            limit = fnmatch.filter(cell["metadata"]["tags"], "limit:*")
+            if len(limit) > 0:
+                limiter = f"df.head({int(limit[0].split(':')[1])}).to_html()"
+            else:
+                limiter = "df.to_html()"
             cell["source"] = (
                 self.import_str
                 + "\n"
                 + self.db_cnx
                 + "\n"
-                + self.db_query.format(source=cell["source"])
+                + self.db_query.format(source=cell["source"], limiter=limiter)
             )
             cell["metadata"]["tags"].remove("sql_execute")
             cell["metadata"]["tags"].append("sql_executed")
@@ -129,4 +134,5 @@ class TranscludePreprocessor(Preprocessor):
         return super().preprocess(nb, resources)
 
     def preprocess_cell(self, cell, resources, _):
+        # Do nothing, juste pass it on
         return cell, resources
