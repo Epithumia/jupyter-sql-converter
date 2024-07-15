@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import List
 from jinja2 import Environment, PackageLoader, select_autoescape
 from nbformat import NotebookNode
 import os
@@ -68,7 +69,7 @@ def include_notebook(main: NotebookNode, included: NotebookNode) -> NotebookNode
     pass
 
 
-def index_solution_cells(cells: [NotebookNode]) -> [str]:
+def index_solution_cells(cells: List[NotebookNode]) -> List[str]:
     cell_index = []
     was_solution = False
     for cell in cells:
@@ -92,7 +93,10 @@ def index_solution_cells(cells: [NotebookNode]) -> [str]:
             )
             or "tags" not in cell["metadata"]
         ):
-            cell_index[-1] = "solution_end"
+            if cell_index[-1] == "solution_start":
+                cell_index[-1] = "solution_start_end"
+            else:
+                cell_index[-1] = "solution_end"
             cell_index.append(None)
             was_solution = False
         else:
@@ -102,7 +106,7 @@ def index_solution_cells(cells: [NotebookNode]) -> [str]:
 
 def preprocess_cells_latex(
     nb: NotebookNode, output_path: str, image_name: str
-) -> [NotebookNode]:
+) -> List[NotebookNode]:
     cells = []
     i = 0
     cell_index = index_solution_cells(nb["cells"])
@@ -123,6 +127,10 @@ def preprocess_cells_latex(
             out = pandoc_write(p, format="latex")
             out = out.replace("\\begin{Highlighting}[]", "\\emph{")
             out = out.replace("\\end{Highlighting}", "}")
+            out = out.replace("\n", "\\\\\n")
+            out = out.replace(r"\begin{Shaded}\\", r"\begin{Shaded}")
+            out = out.replace(r"\end{Shaded}\\", r"\end{Shaded}")
+            out = out.replace("\\\\\n}\\\\", "\n}")
             c["source"] = out
             cells.append(c)
         elif (
@@ -131,9 +139,44 @@ def preprocess_cells_latex(
             and "sql_result" in cell["metadata"]["tags"]
         ):
             i += 1
-            c[
-                "source"
-            ] = f"\\begin{{center}}\n\includegraphics[width=\maxwidth{{\linewidth}}]{{{output_path}/images/{image_name}_{i}.png}}\n\end{{center}}"
+            c["source"] = (
+                f"\\begin{{center}}\n\includegraphics[width=\maxwidth{{\linewidth}}]{{{output_path}/images/{image_name}_{i}.png}}\n\end{{center}}"
+            )
+            cells.append(c)
+        elif (
+            cell["cell_type"] == "markdown"
+            and "tags" in cell["metadata"]
+            and "sql_source" not in cell["metadata"]["tags"]
+        ):
+            p = pandoc_read(cell["source"])
+            out = pandoc_write(p, format="latex")
+            out = out.replace(r"\def\labelenumi{\arabic{enumi}.}", "")
+            out = out.replace("\\tightlist", "")
+            if (
+                "enum:start" in cell["metadata"]["tags"]
+                or "enum:cont" in cell["metadata"]["tags"]
+            ):
+                out = out.replace("\\end{enumerate}", "")
+            if (
+                "enum:end" in cell["metadata"]["tags"]
+                or "enum:cont" in cell["metadata"]["tags"]
+            ):
+                out = out.replace("\\begin{enumerate}", "")
+            if "enum:end" in cell["metadata"]["tags"] and "\\end{enumerate}" not in out:
+                out = out + "\\end{enumerate}"
+            if (
+                "item:start" in cell["metadata"]["tags"]
+                or "enum:cont" in cell["metadata"]["tags"]
+            ):
+                out = out.replace("\\end{itemize}", "")
+            if (
+                "item:end" in cell["metadata"]["tags"]
+                or "enum:cont" in cell["metadata"]["tags"]
+            ):
+                out = out.replace("\\begin{itemize}", "")
+            if "item:end" in cell["metadata"]["tags"] and "\\end{itemize}" not in out:
+                out = out + "\\end{itemize}"
+            c["source"] = out
             cells.append(c)
         else:
             p = pandoc_read(cell["source"])
@@ -145,7 +188,7 @@ def preprocess_cells_latex(
 
 def preprocess_cells_markdown(
     nb: NotebookNode, output_path: str, image_name: str
-) -> [NotebookNode]:
+) -> List[NotebookNode]:
     cells = []
     i = 0
     cell_index = index_solution_cells(nb["cells"])
@@ -177,7 +220,7 @@ def preprocess_cells_markdown(
     return cells
 
 
-def preprocess_cells_markdown_html(nb: NotebookNode) -> [NotebookNode]:
+def preprocess_cells_markdown_html(nb: NotebookNode) -> List[NotebookNode]:
     cells = []
     cell_index = index_solution_cells(nb["cells"])
     cell_number = 0

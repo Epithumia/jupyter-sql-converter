@@ -32,12 +32,12 @@
 
 {% for cell in cells %}
 
-{% if cell['type'] == 'solution_start'%}
+{% if cell['type'] == 'solution_start' or cell['type'] == 'solution_start_end'%}
 \begin{onlysolution}
 \begin{solution}
 {% endif -%}
 {{- cell['source'] -}}
-{% if cell['type'] == 'solution_end'%}
+{% if cell['type'] == 'solution_end' or cell['type'] == 'solution_start_end'%}
 \end{solution}
 \end{onlysolution}
 {% endif -%}
