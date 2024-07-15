@@ -41,7 +41,10 @@ df.index += 1
                 pre["metadata"]["tags"].append("sql_source")
                 nb["cells"].append(nb_from_dict(pre))
                 c["metadata"]["tags"].append("sql_execute")
-            nb["cells"].append(c)
+            if "tags" in c["metadata"] and "ignore" in c["metadata"]["tags"]:
+                continue
+            else:
+                nb["cells"].append(c)
         return super().preprocess(nb, resources, km)
 
     def preprocess_cell(self, cell, resources, index):
