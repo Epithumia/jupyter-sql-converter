@@ -70,37 +70,29 @@ def include_notebook(main: NotebookNode, included: NotebookNode) -> NotebookNode
 
 
 def index_solution_cells(cells: List[NotebookNode]) -> List[str]:
-    cell_index = []
-    was_solution = False
+    cell_index = [None]
     for cell in cells:
-        if (
-            (not was_solution)
-            and "tags" in cell["metadata"]
-            and "correction" in cell["metadata"]["tags"]
-        ):
-            cell_index.append("solution_start")
-            was_solution = True
-        elif (
-            was_solution
-            and "tags" in cell["metadata"]
-            and "correction" in cell["metadata"]["tags"]
-        ):
-            cell_index.append("solution")
-        elif was_solution and (
-            (
-                "tags" in cell["metadata"]
-                and "correction" not in cell["metadata"]["tags"]
-            )
-            or "tags" not in cell["metadata"]
-        ):
-            if cell_index[-1] == "solution_start":
-                cell_index[-1] = "solution_start_end"
+        if "tags" in cell["metadata"] and "correction" in cell["metadata"]["tags"]:
+            if cell_index[-1] is None:
+                cell_index.append("solution_start_end")
+            elif cell_index[-1] == "solution_start_end":
+                cell_index[-1] = "solution_start"
+                cell_index.append("solution")
+            elif cell_index[-1] == "solution":
+                cell_index.append("solution")
             else:
-                cell_index[-1] = "solution_end"
-            cell_index.append(None)
-            was_solution = False
+                raise Exception(f"Unexpected cell type in solution cells : {cell_index}")
         else:
-            cell_index.append(None)
+            if cell_index[-1] is None:
+                cell_index.append(None)
+            elif cell_index[-1] in ["solution_start_end", "solution_end"]:
+                cell_index.append(None)
+            elif cell_index[-1] == "solution":
+                cell_index[-1] = "solution_end"
+                cell_index.append(None)
+            else:
+                raise Exception(f"Unexpected cell type in non-solution cells : {cell_index}")
+    cell_index.pop(0)
     return cell_index
 
 
