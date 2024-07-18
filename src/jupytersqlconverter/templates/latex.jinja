@@ -36,6 +36,18 @@
 \begin{onlysolution}
 \begin{solution}
 {% endif -%}
+{% if 'small' in cell['metadata']['tags'] %}
+\small
+{% endif %}
+{% if 'footnotesize' in cell['metadata']['tags'] %}
+\footnotesize
+{% endif %}
+{% if 'scriptsize' in cell['metadata']['tags'] %}
+\scriptsize
+{% endif %}
+{% if 'tiny' in cell['metadata']['tags'] %}
+\tiny
+{% endif %}
 {{- cell['source'] -}}
 {% if cell['type'] == 'solution_end' or cell['type'] == 'solution_start_end'%}
 \end{solution}
