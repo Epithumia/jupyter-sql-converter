@@ -30,16 +30,17 @@ df.index += 1
         nb["cells"] = []
         for c in cells:
             if "tags" in c["metadata"] and "sql" in c["metadata"]["tags"]:
-                pre = {
-                    "cell_type": "markdown",
-                    "metadata": {},
-                    "source": "```sql\n" + c["source"] + "\n```",
-                }
-                pre["metadata"]["tags"] = c["metadata"]["tags"][:]
-                if "enum:end" in pre["metadata"]["tags"]:
-                    pre["metadata"]["tags"].remove("enum:end")
-                pre["metadata"]["tags"].append("sql_source")
-                nb["cells"].append(nb_from_dict(pre))
+                if "hideinput" not in c["metadata"]["tags"]:
+                    pre = {
+                        "cell_type": "markdown",
+                        "metadata": {},
+                        "source": "```sql\n" + c["source"] + "\n```",
+                    }
+                    pre["metadata"]["tags"] = c["metadata"]["tags"][:]
+                    if "enum:end" in pre["metadata"]["tags"]:
+                        pre["metadata"]["tags"].remove("enum:end")
+                    pre["metadata"]["tags"].append("sql_source")
+                    nb["cells"].append(nb_from_dict(pre))
                 c["metadata"]["tags"].append("sql_execute")
             if "tags" in c["metadata"] and "ignore" in c["metadata"]["tags"]:
                 continue
