@@ -168,6 +168,7 @@ def preprocess_cells_latex(
                 out = out.replace("\\begin{itemize}", "")
             if "item:end" in cell["metadata"]["tags"] and "\\end{itemize}" not in out:
                 out = out + "\\end{itemize}"
+            out = "\n".join(x for x in out.splitlines() if "\\setcounter{enumi}" not in x)
             c["source"] = out
             cells.append(c)
         else:
