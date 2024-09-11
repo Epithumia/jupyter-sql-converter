@@ -115,14 +115,10 @@ def preprocess_cells_latex(
             and "tags" in cell["metadata"]
             and "sql_source" in cell["metadata"]["tags"]
         ):
-            p = pandoc_read(cell["source"])
-            out = pandoc_write(p, format="latex")
-            out = out.replace("\\begin{Highlighting}[]", "\\emph{")
-            out = out.replace("\\end{Highlighting}", "}")
-            out = out.replace("\n", "\\\\\n")
-            out = out.replace(r"\begin{Shaded}\\", r"\begin{Shaded}")
-            out = out.replace(r"\end{Shaded}\\", r"\end{Shaded}")
-            out = out.replace("\\\\\n}\\\\", "\n}")
+            #p = pandoc_read(cell["source"])
+            out = cell["source"]
+            out = out.replace(r"```sql", r"\begin{minted}[breaklines, breaksymbol={},bgcolor=shadecolor]{sql}")
+            out = out.replace(r"```", r"\end{minted}")
             c["source"] = out
             cells.append(c)
         elif (
