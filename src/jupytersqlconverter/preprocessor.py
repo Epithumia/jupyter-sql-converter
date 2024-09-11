@@ -64,13 +64,15 @@ df.index += 1
                 dateformat = dateformat[0].split(":")[1]
             else:
                 dateformat = "YYYY-MM-DD"
+            query = cell["source"]
+            query = query.rstrip().rstrip(";")
             cell["source"] = (
                 self.import_str
                 + "\n"
                 + self.db_cnx
                 + "\n"
                 + self.db_query.format(
-                    source=cell["source"], limiter=limiter, dateformat=dateformat
+                    source=query, limiter=limiter, dateformat=dateformat
                 )
             )
             cell["metadata"]["tags"].remove("sql_execute")
