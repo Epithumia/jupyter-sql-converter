@@ -49,6 +49,9 @@
 \tiny
 {% endif %}
 {{- cell['source'] -}}
+{% if 'small' in cell['metadata']['tags'] or 'footnotesize' in cell['metadata']['tags'] or 'scriptsize' in cell['metadata']['tags'] or 'tiny' in cell['metadata']['tags'] %}
+\normalsize
+{% endif %}
 {% if cell['type'] == 'solution_end' or cell['type'] == 'solution_start_end'%}
 \end{solution}
 \end{onlysolution}
