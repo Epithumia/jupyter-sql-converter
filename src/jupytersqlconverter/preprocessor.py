@@ -13,19 +13,14 @@ class SQLExecuteProcessor(ExecutePreprocessor):
     def __init__(self, cnx_uri, **kw):
         super().__init__(**kw)
         self.import_str = (
-            "import pandas as pd\nfrom sqlalchemy import create_engine, text\nfrom sqlalchemy.exc import ResourceClosedError"
+            "import pandas as pd\nfrom sqlalchemy import create_engine, text"
         )
         self.db_cnx = f"engine = create_engine('{cnx_uri}')"
         self.db_query = """conn = engine.connect()
 conn.execute(text(\"ALTER SESSION SET NLS_DATE_FORMAT = '{dateformat}'\"))
-try:
-    df = pd.read_sql(sql=\"\"\"{source}\"\"\", con=conn)
-    df.index += 1
-    {limiter}
-except ResourceClosedError:
-    pass
-finally:
-    conn.close()
+df = pd.read_sql(sql=\"\"\"{source}\"\"\", con=conn)
+df.index += 1
+{limiter}
 """
 
     def preprocess(
@@ -64,8 +59,6 @@ finally:
                 limiter = f"df.head({int(limit[0].split(':')[1])}).to_html()"
             else:
                 limiter = "df.to_html()"
-            if "noresult" in cell["metadata"]["tags"]:
-                limiter = "pass"
             dateformat = fnmatch.filter(cell["metadata"]["tags"], "dateformat:*")
             if len(dateformat) > 0:
                 dateformat = dateformat[0].split(":")[1]
@@ -73,15 +66,18 @@ finally:
                 dateformat = "YYYY-MM-DD"
             query = cell["source"]
             query = query.rstrip().rstrip(";")
-            cell["source"] = (
-                self.import_str
-                + "\n"
-                + self.db_cnx
-                + "\n"
-                + self.db_query.format(
-                    source=query, limiter=limiter, dateformat=dateformat
+            if "noresult" in cell["metadata"]["tags"]:
+                cell["source"] = "pass"
+            else:
+                cell["source"] = (
+                    self.import_str
+                    + "\n"
+                    + self.db_cnx
+                    + "\n"
+                    + self.db_query.format(
+                        source=query, limiter=limiter, dateformat=dateformat
+                    )
                 )
-            )
             cell["metadata"]["tags"].remove("sql_execute")
             cell["metadata"]["tags"].append("sql_executed")
         return super().preprocess_cell(cell, resources, index)
