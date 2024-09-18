@@ -13,14 +13,19 @@ class SQLExecuteProcessor(ExecutePreprocessor):
     def __init__(self, cnx_uri, **kw):
         super().__init__(**kw)
         self.import_str = (
-            "import pandas as pd\nfrom sqlalchemy import create_engine, text"
+            "import pandas as pd\nfrom sqlalchemy import create_engine, text\nfrom sqlalchemy.exc import ResourceClosedError"
         )
         self.db_cnx = f"engine = create_engine('{cnx_uri}')"
         self.db_query = """conn = engine.connect()
 conn.execute(text(\"ALTER SESSION SET NLS_DATE_FORMAT = '{dateformat}'\"))
-df = pd.read_sql(sql=\"\"\"{source}\"\"\", con=conn)
-df.index += 1
-{limiter}
+try:
+    df = pd.read_sql(sql=\"\"\"{source}\"\"\", con=conn)
+    df.index += 1
+    {limiter}
+except ResourceClosedError:
+    pass
+finally:
+    conn.close()
 """
 
     def preprocess(
@@ -59,6 +64,8 @@ df.index += 1
                 limiter = f"df.head({int(limit[0].split(':')[1])}).to_html()"
             else:
                 limiter = "df.to_html()"
+            if "noresult" in cell["metadata"]["tags"]:
+                limiter = "pass"
             dateformat = fnmatch.filter(cell["metadata"]["tags"], "dateformat:*")
             if len(dateformat) > 0:
                 dateformat = dateformat[0].split(":")[1]
@@ -95,17 +102,18 @@ class CleanupProcessor(ExecutePreprocessor):
                 and "outputs" in c
                 and "sql_executed" in c["metadata"]["tags"]
             ):
-                c["metadata"]["tags"].remove("sql_executed")
-                c["metadata"]["tags"].append("sql_result")
-                output = c["outputs"][0]["data"]["text/plain"]
-                output2 = str(output).replace("\\n", "")
-                output2 = output2.replace("\\'", "'")
-                pre = {
-                    "cell_type": "markdown",
-                    "metadata": {"tags": c["metadata"]["tags"]},
-                    "source": output2[1:-1],
-                }
-                nb["cells"].append(nb_from_dict(pre))
+                if len(c["outputs"]) > 0:
+                    c["metadata"]["tags"].remove("sql_executed")
+                    c["metadata"]["tags"].append("sql_result")
+                    output = c["outputs"][0]["data"]["text/plain"]
+                    output2 = str(output).replace("\\n", "")
+                    output2 = output2.replace("\\'", "'")
+                    pre = {
+                        "cell_type": "markdown",
+                        "metadata": {"tags": c["metadata"]["tags"]},
+                        "source": output2[1:-1],
+                    }
+                    nb["cells"].append(nb_from_dict(pre))
             else:
                 nb["cells"].append(c)
         return super().preprocess(nb, resources, km)
