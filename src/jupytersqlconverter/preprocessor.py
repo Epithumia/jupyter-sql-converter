@@ -22,6 +22,10 @@ df = pd.read_sql(sql=\"\"\"{source}\"\"\", con=conn)
 df.index += 1
 {limiter}
 """
+        self.no_result_query = """conn = engine.connect()
+conn.execute(text(\"ALTER SESSION SET NLS_DATE_FORMAT = '{dateformat}'\"))
+conn.execute(text(\"\"\"{source}\"\"\"))
+"""
 
     def preprocess(
         self, nb: NotebookNode, resources: Any = None, km: KernelManager | None = None
@@ -67,7 +71,16 @@ df.index += 1
             query = cell["source"]
             query = query.rstrip().rstrip(";")
             if "noresult" in cell["metadata"]["tags"]:
-                cell["source"] = "pass"
+                #cell["source"] = "pass"
+                cell["source"] = (
+                    self.import_str
+                    + "\n"
+                    + self.db_cnx
+                    + "\n"
+                    + self.no_result_query.format(
+                        source=query, dateformat=dateformat
+                    )
+                )
             else:
                 cell["source"] = (
                     self.import_str
@@ -98,7 +111,7 @@ class CleanupProcessor(ExecutePreprocessor):
                 and "outputs" in c
                 and "sql_executed" in c["metadata"]["tags"]
             ):
-                if len(c["outputs"]) > 0:
+                if len(c["outputs"]) > 0 and "noresult" not in c["metadata"]["tags"]:
                     c["metadata"]["tags"].remove("sql_executed")
                     c["metadata"]["tags"].append("sql_result")
                     output = c["outputs"][0]["data"]["text/plain"]
