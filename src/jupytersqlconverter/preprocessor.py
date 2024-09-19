@@ -19,6 +19,7 @@ class SQLExecuteProcessor(ExecutePreprocessor):
         self.db_query = """conn = engine.connect()
 conn.execute(text(\"ALTER SESSION SET NLS_DATE_FORMAT = '{dateformat}'\"))
 df = pd.read_sql(sql=\"\"\"{source}\"\"\", con=conn)
+df.fillna("(null)",inplace=True)
 df.index += 1
 {limiter}
 """
