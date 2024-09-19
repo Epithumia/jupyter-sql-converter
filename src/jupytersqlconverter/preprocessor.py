@@ -10,6 +10,13 @@ import nbformat
 
 
 class SQLExecuteProcessor(ExecutePreprocessor):
+
+    date_fmt = {
+        "DD/MM/YYYY" : "%d/%m/%Y",
+        "YYYY-MM-DD" : "%Y-%m-%d",
+        "DD/MM/RR": "%d/%m/%y",
+    }
+
     def __init__(self, cnx_uri, **kw):
         super().__init__(**kw)
         self.import_str = (
@@ -19,7 +26,12 @@ class SQLExecuteProcessor(ExecutePreprocessor):
         self.db_query = """conn = engine.connect()
 conn.execute(text(\"ALTER SESSION SET NLS_DATE_FORMAT = '{dateformat}'\"))
 df = pd.read_sql(sql=\"\"\"{source}\"\"\", con=conn)
+for x in df.select_dtypes(include=['datetime64']).columns.tolist():
+    df[x] = df[x].dt.strftime('{dateformat_str}')
+for x in df.select_dtypes(include=['float64']).columns.tolist():
+    df[x] = df[x].apply(lambda v: '{{:.9g}}'.format(v))
 df.fillna("(null)",inplace=True)
+df = df.replace("nan", "(null)")
 df.index += 1
 {limiter}
 """
@@ -72,7 +84,6 @@ conn.execute(text(\"\"\"{source}\"\"\"))
             query = cell["source"]
             query = query.rstrip().rstrip(";")
             if "noresult" in cell["metadata"]["tags"]:
-                #cell["source"] = "pass"
                 cell["source"] = (
                     self.import_str
                     + "\n"
@@ -89,7 +100,7 @@ conn.execute(text(\"\"\"{source}\"\"\"))
                     + self.db_cnx
                     + "\n"
                     + self.db_query.format(
-                        source=query, limiter=limiter, dateformat=dateformat
+                        source=query, limiter=limiter, dateformat=dateformat, dateformat_str=self.date_fmt[dateformat]
                     )
                 )
             cell["metadata"]["tags"].remove("sql_execute")
