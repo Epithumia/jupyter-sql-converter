@@ -10,6 +10,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from pandoc import read as pandoc_read, write as pandoc_write
 import pandoc
 from pandoc.types import Para, RawInline, Format, Code, BulletList, Plain
+from bs4 import BeautifulSoup as bs
 
 def get_table_image(url, fn: Path, out_dir: Path, name: str, delay=5):
     """Render HTML file in browser and grab a screenshot."""
@@ -132,11 +133,26 @@ def preprocess_cells_latex(
             and "tags" in cell["metadata"]
             and "sql_result" in cell["metadata"]["tags"]
         ):
-            i += 1
-            c["source"] = (
-                f"\\begin{{center}}\n\includegraphics[width=\maxwidth{{\linewidth}}]{{{output_path}/images/{image_name}_{i}.png}}\n\end{{center}}"
-            )
-            cells.append(c)
+            if "extract" in cell["metadata"]["tags"]:
+                import os
+                c["metadata"]["tags"].remove("sql_result")
+                c["metadata"]["tags"].append("sql_source")
+                bs_table = bs(cell["source"], "html.parser")
+                i += 1
+                code = r"\begin{minted}[breaklines, breaksymbol={},bgcolor=shadecolor]{console}"
+                code += os.linesep
+                code += bs_table.find_all('td')[0].text.replace("\\", os.linesep)
+                code += r"\end{minted}"
+                c["source"] = (
+                    code
+                )
+                cells.append(c)
+            else:
+                i += 1
+                c["source"] = (
+                    f"\\begin{{center}}\n\includegraphics[width=\maxwidth{{\linewidth}}]{{{output_path}/images/{image_name}_{i}.png}}\n\end{{center}}"
+                )
+                cells.append(c)
         elif (
             cell["cell_type"] == "markdown"
             and "tags" in cell["metadata"]
