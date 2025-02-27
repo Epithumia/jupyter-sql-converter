@@ -3,11 +3,13 @@ from typing import List
 from jinja2 import Environment, PackageLoader, select_autoescape
 from nbformat import NotebookNode
 import os
+import re
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from pandoc import read as pandoc_read, write as pandoc_write
-
+import pandoc
+from pandoc.types import Para, RawInline, Format, Code, BulletList, Plain
 
 def get_table_image(url, fn: Path, out_dir: Path, name: str, delay=5):
     """Render HTML file in browser and grab a screenshot."""
@@ -117,7 +119,10 @@ def preprocess_cells_latex(
         ):
             #p = pandoc_read(cell["source"])
             out = cell["source"]
-            out = out.replace(r"```sql", r"\begin{minted}[breaklines, breaksymbol={},bgcolor=shadecolor]{sql}")
+            if "oracle" in cell["metadata"]["tags"]:
+                out = out.replace(r"```sql", r"\begin{minted}[breaklines, breaksymbol={},bgcolor=shadecolor]{oraclesql}")
+            else:
+                out = re.sub(r"```(?P<lang>\w+)", r"\\begin{minted}[breaklines, breaksymbol={},bgcolor=shadecolor]{\g<lang>}", out) #out.replace(r"```sql", r"\begin{minted}[breaklines, breaksymbol={},bgcolor=shadecolor]{sql}")
             out = out.replace(r"```", r"\end{minted}")
             out = out.replace("\:", ":")
             c["source"] = out
@@ -138,9 +143,16 @@ def preprocess_cells_latex(
             and "sql_source" not in cell["metadata"]["tags"]
         ):
             p = pandoc_read(cell["source"])
+            for el in pandoc.iter(p):
+                if isinstance(el, Para) or isinstance(el, BulletList) or isinstance(el, Plain):
+                    for i_par in range(len(el[0])):
+                        if isinstance(el[0][i_par], Code):
+                            if m := re.search(r"\{(?P<lang>.+)\}(?P<code>.+)", el[0][i_par][1]):
+                                el[0][i_par] = RawInline(Format("tex"), f"\mintinline[breaklines]{{{m.group('lang')}}}{{{m.group('code')}}}")
             out = pandoc_write(p, format="latex")
             out = out.replace(r"\def\labelenumi{\arabic{enumi}.}", "")
             out = out.replace("\\tightlist", "")
+            out = out.replace(r"\ ", " ")
             if (
                 "enum:start" in cell["metadata"]["tags"]
                 or "enum:cont" in cell["metadata"]["tags"]
@@ -170,7 +182,15 @@ def preprocess_cells_latex(
             cells.append(c)
         else:
             p = pandoc_read(cell["source"])
+            for el in pandoc.iter(p):
+                if isinstance(el, Para) or isinstance(el, BulletList) or isinstance(el, Plain):
+                    for i_par in range(len(el[0])):
+                        if isinstance(el[0][i_par], Code):
+                            if m := re.search(r"\{(?P<lang>.+)\}(?P<code>.+)", el[0][i_par][1]):
+                                el[0][i_par] = RawInline(Format("tex"), f"\mintinline[breaklines]{{{m.group('lang')}}}{{{m.group('code')}}}")
             out = pandoc_write(p, format="latex")
+            out = out.replace("\\tightlist", "")
+            out = out.replace(r"\ ", " ")
             c["source"] = out
             cells.append(c)
     return cells

@@ -113,7 +113,7 @@ class SQLExecuteProcessor(ExecutePreprocessor):
                 limiter = "df.to_html()"
             dateformat = fnmatch.filter(cell["metadata"]["tags"], "dateformat:*")
             if len(dateformat) > 0:
-                dateformat = dateformat[0].split(":")[1]
+                dateformat = ":".join(dateformat[0].split(":")[1:])
             else:
                 dateformat = "YYYY-MM-DD"
             query = cell["source"]
