@@ -119,6 +119,7 @@ def preprocess_cells_latex(
             out = cell["source"]
             out = out.replace(r"```sql", r"\begin{minted}[breaklines, breaksymbol={},bgcolor=shadecolor]{sql}")
             out = out.replace(r"```", r"\end{minted}")
+            out = out.replace("\:", ":")
             c["source"] = out
             cells.append(c)
         elif (
